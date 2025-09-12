@@ -1,0 +1,8 @@
+dataset_path: /workspace/group_share/adc-perception-xplanner/songsy/evaluate_datasets/hub/datasets--lmms-lab--NExTQA/snapshots/a0d7729e38399da9c8a70c59aa4ad7f6996d3c00
+dataset_kwargs:
+  token: True
+  video: True
+  cache_dir: nextqa
+metadata:
+  version: 0.0.1
+  load_package: False

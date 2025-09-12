@@ -1,0 +1,25 @@
+datasets:
+  # - json_path: /workspace/group_share/adc-perception-xplanner/songsy/datasets/test.json
+  #   sampling_strategy: "all"
+  - json_path: /workspace/group_share/adc-perception-xplanner/songsy/datasets/LLaVA-Pretrain/blip_laion_cc_sbu_558k.json
+    sampling_strategy: "all"
+  - json_path: /workspace/group_share/adc-perception-xplanner/songsy/datasets/LLaVA-Video-178K/0_30_s_academic_v0_1/0_30_s_academic_v0_1_cap_processed.json
+    sampling_strategy: "all"
+  - json_path: /workspace/group_share/adc-perception-xplanner/songsy/datasets/LLaVA-Video-178K/0_30_s_youtube_v0_1/0_30_s_youtube_v0_1_cap_processed.json
+    sampling_strategy: "all"
+  - json_path: /workspace/group_share/adc-perception-xplanner/songsy/datasets/LLaVA-Video-178K/30_60_s_academic_v0_1/30_60_s_academic_v0_1_cap_processed.json
+    sampling_strategy: "all"
+  - json_path: /workspace/group_share/adc-perception-xplanner/songsy/datasets/LLaVA-Video-178K/30_60_s_youtube_v0_1/30_60_s_youtube_v0_1_cap_processed.json
+    sampling_strategy: "all"
+  - json_path: /workspace/group_share/adc-perception-xplanner/songsy/datasets/LLaVA-Video-178K/1_2_m_academic_v0_1/1_2_m_academic_v0_1_cap_processed.json
+    sampling_strategy: "all"
+  - json_path: /workspace/group_share/adc-perception-xplanner/songsy/datasets/LLaVA-Video-178K/1_2_m_youtube_v0_1/1_2_m_youtube_v0_1_cap_processed.json
+    sampling_strategy: "all"
+  - json_path: /workspace/group_share/adc-perception-xplanner/songsy/datasets/LLaVA-Video-178K/2_3_m_academic_v0_1/2_3_m_academic_v0_1_cap_processed.json
+    sampling_strategy: "all"
+  - json_path: /workspace/group_share/adc-perception-xplanner/songsy/datasets/LLaVA-Video-178K/2_3_m_youtube_v0_1/2_3_m_youtube_v0_1_cap_processed.json
+    sampling_strategy: "all"
+
+
+
+

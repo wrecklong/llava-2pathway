@@ -1,0 +1,9 @@
+dataset_path: /workspace/group_share/adc-perception-xplanner/songsy/evaluate_datasets/hub/datasets--lmms-lab--PerceptionTest_Val/snapshots/c5e520d8c4167fb1f135c36e9d6e67312b4f8e6b
+dataset_kwargs:
+  token: True
+  video: True
+  cache_dir: perceptiontest_val
+lmms_eval_specific_kwargs:
+  default:
+    pre_prompt: "Select the best answer to the following multiple-choice question based on the video.\n"
+    post_prompt: ""
