@@ -41,7 +41,7 @@ from llava import conversation as conversation_lib
 from llava.model import *
 from llava.model.language_model.hybrid_decoder_layer import Qwen2HybridDecoderLayer
 from llava.model.language_model.hybrid_decoder_layer_qwen3 import Qwen3HybridDecoderLayer, DynamicRouter, Predictor
-from llava.mm_utils import tokenizer_image_token, read_video_pyav2, read_video_decord
+from llava.mm_utils import tokenizer_image_token, read_video_pyav2, read_video_decord,add_timestamp_to_frame
 from llava.utils import TimeoutTerminateCallback, process_video_with_decord
 
 import random
@@ -119,6 +119,7 @@ class DataArguments:
     video_folder: Optional[str] = field(default=None)
     image_aspect_ratio: str = 'square'
     add_video_image_tag: bool = False
+    add_ts: bool = False 
     video_frames: int = 16
     fps: int = 1
 
@@ -225,18 +226,31 @@ def get_mm_adapter_state_maybe_zero_3(named_params, keys_to_match):
 
 def find_all_linear_names(model):
     cls = torch.nn.Linear
-    lora_module_names = set()
-    multimodal_keywords = ['mm_projector', 'vision_tower', 'vision_resampler']
+    # 返回完整路径名称，避免仅用末级名（如 k_proj）误命中视觉侧同名层
+    target_module_fullnames = set()
+    # 屏蔽视觉/多模态与路由相关模块（尽量涵盖常见命名）
+    blacklist_keywords = [
+        'mm_projector', 'vision_tower', 'vision_resampler',
+        'token_router', 'cross_dynamic_router',
+        'vision_model', 'visual', 'mm_vision', 'clip', 'vit', 'vision'
+    ]
+    # 仅收集常见的注意力/MLP投影层
+    allowed_suffixes = (
+        'q_proj', 'k_proj', 'v_proj', 'o_proj',
+        'up_proj', 'down_proj', 'gate_proj',
+    )
     for name, module in model.named_modules():
-        if any(mm_keyword in name for mm_keyword in multimodal_keywords):
+        if any(kw in name for kw in blacklist_keywords):
             continue
         if isinstance(module, cls):
             names = name.split('.')
-            lora_module_names.add(names[0] if len(names) == 1 else names[-1])
+            last = names[0] if len(names) == 1 else names[-1]
+            if last in ('lm_head', 'embed_tokens'):
+                continue
+            if last in allowed_suffixes or any(last.endswith(suf) for suf in allowed_suffixes):
+                target_module_fullnames.add(name)
 
-    if 'lm_head' in lora_module_names: # needed for 16-bit
-        lora_module_names.remove('lm_head')
-    return list(lora_module_names)
+    return list(sorted(target_module_fullnames))
 
 
 def safe_save_model_for_hf_trainer(trainer: transformers.Trainer,
@@ -995,6 +1009,7 @@ class LazySupervisedDataset(Dataset):
         self.tokenizer = tokenizer
         self.list_data_dict = []
         self.data_args = data_args
+        self.add_ts = data_args.add_ts
 
         if "{" in data_path and "}" in data_path:
             base_path, file_pattern = re.match(r"^(.*)\{(.*)\}\.json$", data_path).groups()
@@ -1122,6 +1137,7 @@ class LazySupervisedDataset(Dataset):
 
                     processor = self.data_args.image_processor
                     image = Image.open(image_file).convert('RGB')
+
                     if self.data_args.image_aspect_ratio == 'pad':
                         def expand2square(pil_img, background_color):
                             width, height = pil_img.size
@@ -1177,21 +1193,30 @@ class LazySupervisedDataset(Dataset):
 
                         video_time = total_frames / avg_fps
                           
+                        
                         # Read and store the sampled frames
                         video = []
-                        video_info_string = f"Time: {round(video_time, 2)}s; Time interval between frame {round(video_time/len(sampled_indices),3)}s; video tokens:"
+                        time_interval = round(video_time/len(sampled_indices),3)
+                        video_info_string = f"Time: {round(video_time, 2)}s; Time interval between frame {time_interval}s; video tokens:"
                         for idx in sampled_indices:
                             frame_path = frame_files[idx]
                             try:
                                 with Image.open(frame_path) as img:
                                     frame = img.convert("RGB")
+                        
+                                    if self.add_ts:
+                                        start_sec = i * time_interval
+                                        end_sec = start_sec + time_interval
+                                        frame = add_timestamp_to_frame(frame, start_sec, end_sec)
+                                    
                                     video.append(frame)
+
                             except IOError:
                                 print(f"Failed to read frame at path: {frame_path}")
                     else:
                     # print(self.data_args.video_frames)
                     # video = read_video_pyav2(video_file, self.data_args.video_frames, target_fps=self.data_args.fps)
-                        video, video_info_string = read_video_decord(video_file, self.data_args.video_frames, target_fps=self.data_args.fps)
+                        video, video_info_string = read_video_decord(video_file, self.data_args.video_frames, target_fps=self.data_args.fps, add_ts=self.add_ts)
 
                     processor = self.data_args.image_processor
                     image = processor.preprocess(video, return_tensors='pt')['pixel_values']
@@ -1253,7 +1278,6 @@ class DataCollatorForSupervisedDataset(object):
             labels=labels,
             attention_mask=input_ids.ne(self.tokenizer.pad_token_id),
         )
-
         if 'image' in instances[0]:
             images = [instance['image'] for instance in instances]
             if all(x is not None and (x.shape == images[0].shape and len(x.shape) == 3) for x in images):
@@ -1366,6 +1390,27 @@ def train(attn_implementation=None):
             def make_inputs_require_grad(module, input, output):
                 output.requires_grad_(True)
             model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
+     
+    if training_args.lora_enable:
+        from peft import LoraConfig, get_peft_model
+
+        lora_config = LoraConfig(
+            r=training_args.lora_r,
+            lora_alpha=training_args.lora_alpha,
+            target_modules=find_all_linear_names(model),
+            lora_dropout=training_args.lora_dropout,
+            bias=training_args.lora_bias,
+            task_type="CAUSAL_LM",
+        )
+        if training_args.bits == 16:
+            if training_args.bf16:
+                model.to(torch.bfloat16)
+            if training_args.fp16:
+                model.to(torch.float16)
+        rank0_print("Adding LoRA adapters...")
+        model = get_peft_model(model, lora_config)
+        #model.get_model().vision_tower.requires_grad_(True)
+    
 
     if "qwen" in model_args.model_name_or_path.lower():
         tokenizer = transformers.AutoTokenizer.from_pretrained(
@@ -1444,19 +1489,31 @@ def train(attn_implementation=None):
             model_args.mm_training_video_frames = data_args.video_frames
             model.get_model().initialize_slow_branch_modules(model_args)
 
-        for name, module in model.get_model().named_modules():
+        # 先设置设备类型
+        for name, module in model.named_modules():
             if isinstance(module, Predictor):
                 module.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device=training_args.device)
-                for k, p in module.named_parameters():
-                    p.requires_grad = True
             elif isinstance(module, DynamicRouter):
                 module.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device=training_args.device)
-                for k, p in module.named_parameters():
-                    p.requires_grad = True
         
         for name, module in model.get_model().named_modules():
             if isinstance(module, Qwen3HybridDecoderLayer):
                 module.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device=training_args.device)
+        
+        # 全局冻结所有参数
+        model.requires_grad_(False)
+
+        # 然后重新设置需要训练的参数
+        for name, module in model.named_modules():
+            if isinstance(module, Predictor):
+                for k, p in module.named_parameters():
+                    p.requires_grad = True
+            elif isinstance(module, DynamicRouter):
+                for k, p in module.named_parameters():
+                    p.requires_grad = True
+
+        for name, module in model.get_model().named_modules():
+            if isinstance(module, Qwen3HybridDecoderLayer):
                 for k, p in module.named_parameters():
                     if "cross_attn_gate_proj" in k or "cross_attn_warm_up_gate" in k:
                         p.requires_grad = True
@@ -1477,10 +1534,17 @@ def train(attn_implementation=None):
     data_module = make_supervised_data_module(tokenizer=tokenizer,
                                               data_args=data_args)
     
-    for name, module in model.named_children():
-        num_params = sum(p.numel() for p in module.parameters())
-        print(f"{name}: {num_params} parameters")
-
+    # for name, module in model.get_model().named_children():
+    #     num_params = sum(p.numel() for p in module.parameters())
+    #     print(f"{name}: {num_params} parameters")
+    
+    
+    # 遍历模型参数，打印那些需要梯度的参数
+    # print("需要梯度的参数如下：")
+    # for name, param in model.named_parameters():
+    #     if param.requires_grad:
+    #         print(name)
+    
     trainer = LlavaTrainer(model=model,
                            tokenizer=tokenizer,
                            args=training_args,

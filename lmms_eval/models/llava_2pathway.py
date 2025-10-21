@@ -29,12 +29,14 @@ from llava.model.builder import load_pretrained_model
 from llava.mm_utils import tokenizer_image_token, get_model_name_from_path, KeywordsStoppingCriteria
 import concurrent.futures
 from PIL import Image
+from PIL import ImageDraw, ImageFont
+import gc
 
 @register_model("llava_2pathway")
 class Llava2pathwayVideoMLLM(lmms):
     def __init__(
         self,
-        pretrained: str = "shi-labs/slowfast-video-mllm-qwen2-7b-convnext-576-frame64-s1t4",
+        pretrained: str = "/workspace/group_share/adc-perception-xplanner/songsy/llava-qwen-2pathway/baseline_siglip/finetune/",
         truncation: Optional[bool] = True,
         device: Optional[str] = "cuda",
         dtype: Optional[Union[str, torch.dtype]] = "auto",
@@ -46,6 +48,7 @@ class Llava2pathwayVideoMLLM(lmms):
         truncate_context=False,
         num_frames: int = 32,
         fps: int = 2,
+        add_ts = False,
         video_decode_backend="pyav",
         **kwargs,
     ) -> None:
@@ -89,6 +92,7 @@ class Llava2pathwayVideoMLLM(lmms):
         self.use_cache = use_cache
         self.truncate_context = truncate_context
         self.fps = fps
+        self.add_ts = add_ts
         
                 
         # assert self.batch_size_per_gpu == 1, "Llava currently does not support batched generation. See https://github.com/haotian-liu/LLaVA/issues/754. HF Llava also has this issue."
@@ -161,7 +165,46 @@ class Llava2pathwayVideoMLLM(lmms):
     def tok_decode(self, tokens):
         return self.tokenizer.decode(tokens)
 
-    def load_video(self, video_path):
+    def add_timestamp_to_frame(self, frame, start_sec, end_sec, font_size=40):
+        # 计算时间戳区域高度（基于原图像高度）
+        timestamp_height = int(frame.height * 0.04)  # 原图像高度的10%
+        
+        # 创建新的画布（高度增加时间戳区域）
+        new_height = frame.height + timestamp_height
+        new_frame = Image.new('RGB', (frame.width, new_height), color=(255, 255, 255))
+        
+        # 将原图像粘贴到新画布的下半部分
+        new_frame.paste(frame, (0, timestamp_height))
+        
+        # 在新画布的上半部分添加时间戳
+        draw = ImageDraw.Draw(new_frame)
+        font_size = int(frame.height * 0.04)
+        #font = ImageFont.load_default(font_size)
+        font = ImageFont.truetype("DejaVuSans.ttf", font_size)
+        
+        text = f"{self.sec2hms(start_sec)}-{self.sec2hms(end_sec)}"
+        bbox = draw.textbbox((0, 0), text, font=font)
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
+        
+        # 时间戳居中显示在上方区域
+        x = (frame.width - text_w) // 2
+        y = (timestamp_height - text_h - 3) // 2
+        
+        # 修复矩形绘制：使用 RGB 颜色，不透明
+        draw.rectangle([x-15, y-6, x+text_w+15, y+text_h+6], fill=(50, 50, 50))  # 移除了透明度
+        draw.text((x, y), text, fill=(255, 255, 255), font=font)
+        
+        return new_frame
+    
+    def sec2hms(self,seconds):
+        seconds = int(round(seconds))
+        h = seconds // 3600
+        m = (seconds % 3600) // 60
+        s = seconds % 60
+        return f"{h:02d}:{m:02d}:{s:02d}"
+
+    def load_video(self, video_path, add_ts=False):
         max_frames_num = self.num_frames
         vr = VideoReader(video_path, num_threads=4)
         total_frame_num = len(vr)
@@ -173,6 +216,16 @@ class Llava2pathwayVideoMLLM(lmms):
         spare_frames = vr.get_batch(frame_idx).asnumpy()
         
         total_time = total_frame_num / fps
+        time_interval = round(total_time/len(frame_idx),3)
+        start_sec, end_sec = 0,0
+        frames_with_ts = []
+        if add_ts:
+            for i, frame in enumerate(spare_frames):
+                start_sec = i * time_interval
+                end_sec = start_sec + time_interval
+                frame_with_ts = self.add_timestamp_to_frame(frame, start_sec, end_sec)
+                frames_with_ts.append(frame_with_ts)
+            spare_frames = frames_with_ts
         video_info_string = f"Time: {round(total_time, 2)}s; Time interval between frame {round(total_time/len(frame_idx), 3)}s; video tokens:"
     
         return spare_frames, video_info_string
@@ -191,20 +244,23 @@ class Llava2pathwayVideoMLLM(lmms):
         num_beams = getattr(gen_kwargs, "num_beams", 1)
         top_p = getattr(gen_kwargs, "top_p", 1.0)
         
-        output_ids = self.model.generate(
-            input_ids,
-            attention_mask=attention_masks,
-            pad_token_id=pad_token_ids,
-            images=video,
-            do_sample=do_sample,
-            temperature=temperature,
-            max_new_tokens=max_new_tokens,
-            num_beams=num_beams,
-            top_p=top_p,
-            use_cache=self.use_cache,
-        )
-        
+        with torch.inference_mode():
+            # 避免计算图及中间缓存
+            output_ids = self.model.generate(
+                input_ids,
+                attention_mask=attention_masks,
+                pad_token_id=pad_token_ids,
+                images=video,
+                do_sample=do_sample,
+                temperature=temperature,
+                max_new_tokens=max_new_tokens,
+                num_beams=num_beams,
+                top_p=top_p,
+                use_cache=self.use_cache,
+            )
         outputs = self.tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
+        # 及时释放 GPU 张量
+        del output_ids
         return outputs
 
     def generate_until(self, requests):
@@ -222,18 +278,19 @@ class Llava2pathwayVideoMLLM(lmms):
             video_info_string = None 
             for visual in visuals:
                 if isinstance(visual, Image.Image):
-
-                    image_tensor = self.image_processor.preprocess(visual, return_tensors="pt")["pixel_values"].half().cuda()
-                    videos.append(image_tensor)
+                    with torch.inference_mode():
+                        image_tensor = self.image_processor.preprocess(visual, return_tensors="pt")["pixel_values"].half().to(self.device, non_blocking=True)
+                        videos.append(image_tensor)
                 else:
-
                     try:
                         if self.video_decode_backend == "decord":
-                            video, video_info_string = self.load_video(visual)
+                            video, video_info_string = self.load_video(visual, self.add_ts)
                         elif self.video_decode_backend == "pyav":
-                            video, video_info_string = read_video_pyav2(visual, num_frm=self.num_frames, target_fps=self.fps)
-                        video_tensor = self.image_processor.preprocess(video, return_tensors="pt")["pixel_values"].half().cuda()
-                        videos.append(video_tensor)
+                            video, video_info_string = read_video_pyav2(visual, num_frm=self.num_frames, target_fps=self.fps, add_ts=self.add_ts)
+                        with torch.inference_mode():
+                            video_tensor = self.image_processor.preprocess(video, return_tensors="pt")["pixel_values"].half().to(self.device, non_blocking=True)
+                            videos.append(video_tensor)
+                        del video
                     except Exception as e:
                         eval_logger.error(f"Error {e} in reading video file {visual}")
                         outputs = ""
@@ -258,8 +315,8 @@ class Llava2pathwayVideoMLLM(lmms):
 
             input_ids_list = [tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt")]
             pad_token_ids = self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else self.tokenizer.eos_token_id
-            input_ids = self.pad_sequence(input_ids_list, batch_first=True, padding_value=pad_token_ids).to(self.device)
-            attention_masks = input_ids.ne(pad_token_ids).to(self.device)
+            input_ids = self.pad_sequence(input_ids_list, batch_first=True, padding_value=pad_token_ids).to(self.device, non_blocking=True)
+            attention_masks = input_ids.ne(pad_token_ids).to(self.device, non_blocking=True)
             
             try:
                 with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -272,6 +329,19 @@ class Llava2pathwayVideoMLLM(lmms):
                 eval_logger.error(f"Error {e} in generating")
                 outputs = ""
 
+            # 清理本轮请求中分配的显存/内存
+            try:
+                del input_ids
+                del attention_masks
+                del input_ids_list
+                for v in videos:
+                    del v
+                del videos
+            except Exception:
+                pass
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
             return outputs
                 
         for contexts, gen_kwargs, doc_to_visual, doc_id, task, split in [reg.args for reg in requests]:        

@@ -10,7 +10,17 @@ metric_list:
   - metric: WUPS
     aggregation: !function utils.nextqa_aggregate_results
     higher_is_better: true
-include: _default_template_yaml
+dataset_path: parquet
+dataset_kwargs:
+  token: True
+  video: True
+  cache_dir: nextqa
+  data_files:
+    validation:
+      /workspace/group_share/adc-perception-xplanner/songsy/evaluate_datasets/hub/datasets--lmms-lab--NExTQA/snapshots/a0d7729e38399da9c8a70c59aa4ad7f6996d3c00/OE/validation-00000-of-00001.parquet
+metadata:
+  version: 0.0.1
+  load_package: False
 lmms_eval_specific_kwargs:
   default:
     pre_prompt: ""

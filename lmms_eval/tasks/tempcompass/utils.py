@@ -420,7 +420,7 @@ def get_llm_output_for_captioning(prompt):
 
 
 # utils functions for captioning: consolidate and return gpt outputs
-def get_eval_result_for_captioning(prompt, mc_answer, maxtry=1):
+def get_eval_result_for_captioning(prompt, mc_answer, maxtry=0):
     while True:
         try:
             llm_output, token_count = get_llm_output_for_captioning(prompt)
@@ -472,7 +472,7 @@ def extract_pred(video_llm_output):
 
 
 # utils function for gpt_evaluation when rule-based matching is unsuccessful
-def get_eval_result(prompt, maxtry=1, sys_prompt=None):
+def get_eval_result(prompt, maxtry=0, sys_prompt=None):
     llm_output = None
     while True:
         try:

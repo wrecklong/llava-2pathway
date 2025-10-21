@@ -79,3 +79,187 @@ datasets:
     sampling_strategy: "all"
   - json_path: /workspace/group_share/adc-perception-xplanner/songsy/datasets/LLaVA-Video-178K/2_3_m_activitynetqa/2_3_m_activitynetqa_oe_qa_processed.json
     sampling_strategy: "all"
+  
+# #onevison data
+#   - json_path: /workspace/group_share/adc-perception-xplanner/songsy/datasets/ai2d(cauldron,llava_format)/ai2d(cauldron,llava_format).json
+#     sampling_strategy: "all"
+#   - json_path: /workspace/group_share/adc-perception-xplanner/songsy/datasets/ai2d(gpt4v)/ai2d(gpt4v).json
+#     sampling_strategy: "all"
+#   - json_path: /workspace/group_share/adc-perception-xplanner/songsy/datasets/ai2d(internvl)/ai2d(internvl).json
+#     sampling_strategy: "all"
+#   - json_path: /workspace/group_share/adc-perception-xplanner/songsy/datasets/allava_instruct_laion4v/allava_instruct_laion4v.json
+#     sampling_strategy: "all"
+#   - json_path: /workspace/group_share/adc-perception-xplanner/songsy/datasets/allava_instruct_vflan4v/allava_instruct_vflan4v.json
+#     sampling_strategy: "all"
+#   - json_path: /workspace/group_share/adc-perception-xplanner/songsy/datasets/aokvqa(cauldron,llava_format)/aokvqa(cauldron,llava_format).json
+#     sampling_strategy: "all"
+#   - json_path: /workspace/group_share/adc-perception-xplanner/songsy/datasets/chart2text(cauldron)/chart2text(cauldron).json
+#     sampling_strategy: "all"
+#   - json_path: /workspace/group_share/adc-perception-xplanner/songsy/datasets/chartqa(cauldron,llava_format)/chartqa(cauldron,llava_format).json
+#     sampling_strategy: "all"  
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/chrome_writting/chrome_writting.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/CLEVR-Math(MathV360K)/CLEVR-Math(MathV360K).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/clevr(cauldron,llava_format)/clevr(cauldron,llava_format).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/diagram_image_to_text(cauldron)/diagram_image_to_text(cauldron).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/dvqa(cauldron,llava_format)/dvqa(cauldron,llava_format).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/Evol-Instruct-GPT4-Turbo/Evol-Instruct-GPT4-Turbo.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/figureqa(cauldron,llava_format)/figureqa(cauldron,llava_format).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/FigureQA(MathV360K)/FigureQA(MathV360K).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/geo3k/geo3k.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/geo170k(align)/geo170k(align).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/geo170k(qa)/geo170k(qa).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/Geometry3K(MathV360K)/Geometry3K(MathV360K).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/geomverse(cauldron)/geomverse(cauldron).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/GeoQA+(MathV360K)/GeoQA+(MathV360K).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/GEOS(MathV360K)/GEOS(MathV360K).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/hateful_memes(cauldron,llava_format)/hateful_memes(cauldron,llava_format).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/hitab(cauldron,llava_format)/hitab(cauldron,llava_format).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/hme100k/hme100k.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/iam(cauldron)/iam(cauldron).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/iconqa(cauldron,llava_format)/iconqa(cauldron,llava_format).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/IconQA(MathV360K)/IconQA(MathV360K).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/iiit5k/iiit5k.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/image_textualization(filtered)/image_textualization(filtered).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/infographic_vqa/infographic_vqa.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/infographic_vqa_llava_format/infographic_vqa_llava_format.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/infographic(gpt4v)/infographic(gpt4v).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/intergps(cauldron,llava_format)/intergps(cauldron,llava_format).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/k12_printing/k12_printing.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/llava_wild_4v_12k_filtered/llava_wild_4v_12k_filtered.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/llava_wild_4v_39k_filtered/llava_wild_4v_39k_filtered.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/llavar_gpt4_20k/llavar_gpt4_20k.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/lrv_chart/lrv_chart.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/lrv_normal(filtered)/lrv_normal(filtered).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/magpie_pro(l3_80b_mt)/magpie_pro(l3_80b_mt).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/magpie_pro(l3_80b_st)/magpie_pro(l3_80b_st).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/magpie_pro(qwen2_72b_st)/magpie_pro(qwen2_72b_st).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/mapqa(cauldron,llava_format)/mapqa(cauldron,llava_format).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/MapQA(MathV360K)/MapQA(MathV360K).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/mathqa/mathqa.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/MathV360K_TQA/MathV360K_TQA.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/MathV360K_VQA-AS/MathV360K_VQA-AS.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/MathV360K_VQA-RAD/MathV360K_VQA-RAD.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/mavis_math_metagen/mavis_math_metagen.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/mavis_math_rule_geo/mavis_math_rule_geo.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/multihiertt(cauldron)/multihiertt(cauldron).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/orand_car_a/orand_car_a.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/PMC-VQA(MathV360K)/PMC-VQA(MathV360K).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/raven(cauldron)/raven(cauldron).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/rendered_text(cauldron)/rendered_text(cauldron).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/robut_sqa(cauldron)/robut_sqa(cauldron).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/robut_wikisql(cauldron)/robut_wikisql(cauldron).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/robut_wtq(cauldron,llava_format)/robut_wtq(cauldron,llava_format).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/scienceqa(cauldron,llava_format)/scienceqa(cauldron,llava_format).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/scienceqa(nona_context)/scienceqa(nona_context).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/screen2words(cauldron)/screen2words(cauldron).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/sharegpt4o/sharegpt4o.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/sharegpt4v(coco)/sharegpt4v(coco).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/sharegpt4v(knowledge)/sharegpt4v(knowledge).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/sharegpt4v(llava)/sharegpt4v(llava).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/sharegpt4v(sam)/sharegpt4v(sam).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/sroie/sroie.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/st_vqa(cauldron,llava_format)/st_vqa(cauldron,llava_format).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/Super-CLEVR(MathV360K)/Super-CLEVR(MathV360K).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/tabmwp(cauldron)/tabmwp(cauldron).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/TabMWP(MathV360K)/TabMWP(MathV360K).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/tallyqa(cauldron,llava_format)/tallyqa(cauldron,llava_format).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/textcaps/textcaps.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/textocr(gpt4v)/textocr(gpt4v).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/textocr(gpt4v)/textocr(gpt4v).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/textocr(gpt4v)/textocr(gpt4v).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/tqa(cauldron,llava_format)/tqa(cauldron,llava_format).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/UniGeo(MathV360K)/UniGeo(MathV360K).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/ureader_cap/ureader_cap.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/ureader_ie/ureader_ie.json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/vision_flan(filtered)/vision_flan(filtered).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/vistext(cauldron)/vistext(cauldron).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/visual7w(cauldron,llava_format)/visual7w(cauldron,llava_format).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/visualmrc(cauldron)/visualmrc(cauldron).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/VisualWebInstruct(filtered)/VisualWebInstruct(filtered).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/VizWiz(MathV360K)/VizWiz(MathV360K).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/vqarad(cauldron,llava_format)/vqarad(cauldron,llava_format).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/vsr(cauldron,llava_format)/vsr(cauldron,llava_format).json
+#     sampling_strategy: "all"
+#   - json_path : /workspace/group_share/adc-perception-xplanner/songsy/datasets/websight(cauldron)/websight(cauldron).json
+#     sampling_strategy: "all"

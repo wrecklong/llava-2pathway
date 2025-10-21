@@ -43,10 +43,10 @@ class LlavaQwenSlowFastModel(LlavaMetaModel, Qwen2Model):
         # initialize the cross-attention layers
         self.slow_branch_is_initialized = False
         
-        # length = len(self.layers)
-        # self.layers = nn.ModuleList(
-        #         [Qwen2DecoderLayer(config, idx) for idx in range(config.num_hidden_layers)]
-        #     )
+        length = len(self.layers)
+        self.layers = nn.ModuleList(
+                [Qwen2DecoderLayer(config, idx) for idx in range(config.num_hidden_layers)]
+            )
         
         if hasattr(config, "cross_attn_every_n_layers"):
             self.initialize_slow_branch_modules(config)
@@ -133,7 +133,7 @@ class LlavaQwenSlowFastModel(LlavaMetaModel, Qwen2Model):
         use_cache = use_cache if use_cache is not None else self.config.use_cache
 
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
+        
         if (input_ids is None) ^ (inputs_embeds is not None):
             raise ValueError(
                 "You cannot specify both input_ids and inputs_embeds at the same time, and must specify either one"

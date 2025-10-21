@@ -1,4 +1,29 @@
-include: _default_template.yaml
+dataset_path: /workspace/group_share/adc-perception-xplanner/songsy/evaluate_datasets/hub/datasets--OpenGVLab--MVBench/snapshots/230a2d4fac8900333c61754641c7a13e069ac9c6
+dataset_kwargs:
+  token: True
+  cache_dir: mvbench
+  video: True
+  data_files: 
+    train: /workspace/group_share/adc-perception-xplanner/songsy/evaluate_datasets/hub/datasets--OpenGVLab--MVBench/snapshots/230a2d4fac8900333c61754641c7a13e069ac9c6/json/moving_attribute.json 
+
+generation_kwargs:
+  max_new_tokens: 16
+  temperature: 0
+  top_p: 1.0
+  num_beams: 1
+  do_sample: false
+
+output_type: generate_until
+doc_to_visual: !function utils.mvbench_doc_to_visual
+doc_to_text: !function utils.mvbench_doc_to_text
+doc_to_target: "answer"
+# The return value of process_results will be used by metrics
+process_results: !function utils.mvbench_process_results
+# Note that the metric name can be either a registed metric function (such as the case for GQA) or a key name returned by process_results
+metric_list:
+  - metric: mvbench_accuracy
+    aggregation: !function utils.mvbench_aggregate_results
+    higher_is_better: true
 task: mvbench_moving_attribute
 dataset_name: moving_attribute
 test_split: train

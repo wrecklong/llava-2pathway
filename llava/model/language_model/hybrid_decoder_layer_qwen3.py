@@ -587,6 +587,7 @@ class Qwen3FlashAttention2(Qwen3Attention):
         else:
             sliding_window = None
 
+        q_len = query_states.shape[2]
         attn_output = _flash_attention_forward(
             query_states,
             key_states,
@@ -777,7 +778,7 @@ class Qwen3HybridFlashAttention2(Qwen3FlashAttention2):
         vision_value = repeat_kv(vision_value, self.num_key_value_groups)
         
         # expend_cross_attn_mask
-        attention_mask = text2vision_cross_attn_mask[:, None, :].repeat(1, text_query.shape[2], 1) 
+        attention_mask = text2vision_cross_attn_mask[:, None, :].repeat(1, text_query.shape[2], 1) .to(torch.bool)
         vision_context = self.cross_attn_core_attention(text_query, vision_key, vision_value, attn_mask=attention_mask)
 
         # mask out the output if a sample is pure text
@@ -923,54 +924,53 @@ class Qwen3HybridFlashAttention2(Qwen3FlashAttention2):
         ####
         all_text_mask = (token_type == 3).sum(dim=-1).bool() # [bs, ] if False, indicate that this sample contains no image input
         
-        if activation_mask.sum() != 0:
-            if self.cross_attention_implementation.startswith("vanilla"): # all tokens can attend to the slow tokens
-                visual_hidden_states_activated = visual_hidden_states[activation_mask]
-                attn_output_activated = attn_output[activation_mask]
-                query_states_activated = query_states[activation_mask]
-                all_text_mask_activated = all_text_mask[activation_mask]
-                text2visual_attention_mask_activated = text2visual_attention_mask[activation_mask]
-                attn_output_activated = self.all2media_cross_attn(attn_output_activated.permute(1, 0, 2), 
-                                                        query_states.permute(1, 0, 2, 3),
-                                                        visual_hidden_states_activated, 
-                                                        text2visual_attention_mask_activated,
-                                                        all_text_mask_activated)
-                
-                new_output = attn_output.clone()
-                # 只对需要激活的样本赋值
-                new_output[activation_mask] = attn_output_activated
-                attn_output = new_output
-                attn_output = attn_output.permute(1,0,2)
-                
-            elif self.cross_attention_implementation.startswith("text-only-vanilla"): # only text tokens are allowed to attend the slow tokens
-                visual_hidden_states_activated = visual_hidden_states[activation_mask]
-                attn_output_activated = attn_output[activation_mask]
-                query_states_activated = query_states[activation_mask]
-                all_text_mask_activated = all_text_mask[activation_mask]
-                text2visual_attention_mask_activated = text2visual_attention_mask[activation_mask]
-                token_type_activated = token_type[activation_mask]
-                attn_output_activated = self.onlytext2media_cross_attn(attn_output_activated, 
-                                                            query_states_activated, 
-                                                            visual_hidden_states_activated,
-                                                            token_type=token_type_activated,
-                                                            text2vision_cross_attn_mask=text2visual_attention_mask_activated,
-                                                            all_text_mask=all_text_mask_activated,
-                                                            )
-                #attn_output[activation_mask] = attn_output_activated
-                new_output = attn_output.clone()
-                # 只对需要激活的样本赋值
-                new_output[activation_mask] = attn_output_activated
-                attn_output = new_output
+        if activation_mask is not None:
+            # 统一执行路径：始终执行 cross-attn，再用连续掩码进行插值融合，确保各 rank 参与相同计算图
+            if self.cross_attention_implementation.startswith("vanilla"):
+                attn_output_all = self.all2media_cross_attn(
+                    attn_output.permute(1, 0, 2),
+                    query_states.permute(1, 0, 2, 3),
+                    visual_hidden_states,
+                    text2visual_attention_mask,
+                    all_text_mask,
+                ).permute(1, 0, 2)
+            elif self.cross_attention_implementation.startswith("text-only-vanilla"):
+                attn_output_all = self.onlytext2media_cross_attn(
+                    attn_output,
+                    query_states,
+                    visual_hidden_states,
+                    token_type=token_type,
+                    text2vision_cross_attn_mask=text2visual_attention_mask,
+                    all_text_mask=all_text_mask,
+                )
             else:
                 raise NotImplementedError(f"cross-attention type {self.cross_attention_implementation} not implemented")
+
+            # 将 batch 级激活掩码广播到 [B, 1, 1] 后进行线性插值
+            mask = activation_mask
+            if mask.dim() == 1:
+                mask = mask.reshape(-1, 1, 1)
+            attn_output = attn_output * (1.0 - mask) + attn_output_all * mask
+
         else:
-            extended_attn_output = torch.zeros_like(attn_output, dtype=attn_output.dtype, device=attn_output.device)
-            gate_value = self.cross_attn_gate_proj(attn_output) # n, D
-            if "warmup" in self.gating_type:
-                gate_value = gate_value * self.cross_attn_warm_up_gate.tanh()
-            extended_attn_output = extended_attn_output + gate_value * 0
-            attn_output = attn_output + extended_attn_output
-         
+            if self.cross_attention_implementation.startswith("vanilla"): # all tokens can attend to the slow tokens
+                attn_output = self.all2media_cross_attn(attn_output.permute(1, 0, 2), 
+                                                        query_states.permute(1, 0, 2, 3),
+                                                        visual_hidden_states, 
+                                                        text2visual_attention_mask,
+                                                        all_text_mask)
+                attn_output = attn_output.permute(1,0,2)
+            
+            elif self.cross_attention_implementation.startswith("text-only-vanilla"): # only text tokens are allowed to attend the slow tokens
+                attn_output = self.onlytext2media_cross_attn(attn_output, 
+                                                         query_states, 
+                                                         visual_hidden_states,
+                                                         token_type=token_type,
+                                                         text2vision_cross_attn_mask=text2visual_attention_mask,
+                                                         all_text_mask=all_text_mask
+                                                         )
+            else:
+                raise NotImplementedError(f"cross-attention type {self.cross_attention_implementation} not implemented")      
    
         attn_output = self.o_proj(attn_output)
 
@@ -1212,7 +1212,7 @@ class Qwen3HybridSdpaAttention(Qwen3SdpaAttention):
 
         key_states = repeat_kv(key_states, self.num_key_value_groups)
         value_states = repeat_kv(value_states, self.num_key_value_groups)
-
+        
         causal_mask = attention_mask
         if attention_mask is not None:  # no matter the length, we just slice it
             causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
@@ -1453,7 +1453,6 @@ class Qwen3HybridDecoderLayer(nn.Module):
                 Arbitrary kwargs to be ignored, used for FSDP and other methods that injects code
                 into the model
         """
-
         residual = hidden_states
 
         hidden_states = self.input_layernorm(hidden_states)
@@ -1568,7 +1567,8 @@ class Predictor(nn.Module):
             text_related_tokens_mask = torch.zeros_like(probs, dtype=torch.bool)
             text_related_tokens_mask.scatter_(-1, topk_indices, 1)  # 将选中的位置设为1
 
-        return text_related_tokens_mask.to(torch.bool)
+      # 训练时返回float以保留梯度；推理时返回bool掩码
+        return text_related_tokens_mask if self.training else text_related_tokens_mask.to(torch.bool)
 
 
 class DynamicRouter(nn.Module):
@@ -1579,17 +1579,24 @@ class DynamicRouter(nn.Module):
         
         # 用输入特征的均值作为路由输入
         self.router = nn.Sequential(
-            nn.Linear(d_model, 64),
+            nn.Linear(d_model, d_model//2),
             nn.ReLU(),
-            nn.Linear(64, num_layers)  # 输出每层的得分
+            nn.Linear(d_model//2, d_model//4),
+            nn.ReLU(),
+            nn.Linear(d_model//4, num_layers)  # 输出每层的得分
         )
+
+        
         # 负载均衡辅助损失
         self.aux_loss = 0
+        
 
     def forward(self, x):
         """ x: 输入特征 [batch, seq_len, d_model] """
         # 计算路由得分 [batch, num_layers]
         pooled = x.mean(dim=1)  # [batch, d_model]
+        # 确保数据类型匹配
+        pooled = pooled.to(next(self.router.parameters()).dtype)
         scores = self.router(pooled)  # [batch, num_layers]
         # Gumbel-Softmax采样（训练时用soft近似，推理时硬采样）
         if self.training:
@@ -1601,11 +1608,10 @@ class DynamicRouter(nn.Module):
             activation_mask = torch.zeros_like(probs)
             activation_mask.scatter_(-1, topk_indices, 1)  # 将选中的位置设为1
         
-        
         # 计算负载均衡损失（防止专家垄断）
         #self.aux_loss = self._load_balancing_loss(probs, activation_mask)
         
-        return activation_mask.to(torch.bool)  # [batch, num_layers] 其中num_experts个位置为1
+        return activation_mask  # [batch, num_layers] 其中num_experts个位置为1
 
     def _load_balancing_loss(self, probs, mask):
         # 参考Switch Transformer的负载均衡损失

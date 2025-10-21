@@ -1,6 +1,6 @@
 #!/bin/bash
 NAME=$1
-ANNOTATION_PATH="/workspace/p-songsy@xiaopeng.com/Slow-Fast-Video-Multimodal-LLM/scripts/exp_finetune.yaml"
+ANNOTATION_PATH="./scripts/exp_finetune.yaml"
 IMAGE_DIR="/workspace/group_share/adc-perception-xplanner/songsy/datasets/"
 VIDEO_DIR="/workspace/group_share/adc-perception-xplanner/songsy/datasets/LLaVA-Video-178K"
 
@@ -10,11 +10,12 @@ VIDEO_DIR="/workspace/group_share/adc-perception-xplanner/songsy/datasets/LLaVA-
 # NODE_RANK=0
 
 pip install transformers==4.51.0
+#pip install triton==2.3.0
 export TORCH_NCCL_TRACE_BUFFER_SIZE=1000000
-export TORCH_NCCL_TRACE_DUMP_DIR=/workspace/p-songsy@xiaopeng.com/Slow-Fast-Video-Multimodal-LLM/nccl_log
+export TORCH_NCCL_TRACE_DUMP_DIR=/workspace/p-songsy@xiaopeng.com/llava-2pathway/nccl_log
 
 
-torchrun --master_addr $MASTER_ADDR --master_port $MASTER_PORT --nnodes=${WORLD_SIZE} \
+torchrun --master-addr $MASTER_ADDR --master_port ${MASTER_PORT} --nnodes=${WORLD_SIZE} \
     --nproc_per_node=16 --node_rank=$NODE_RANK  train.py \
     --deepspeed ./scripts/zero2.json \
     --model_name_or_path /workspace/group_share/adc-perception-xplanner/songsy/llava-qwen-2pathway/$NAME/pretrain/\
@@ -24,7 +25,7 @@ torchrun --master_addr $MASTER_ADDR --master_port $MASTER_PORT --nnodes=${WORLD_
     --video_folder ${VIDEO_DIR}  \
     --vision_tower "/workspace/group_share/adc-perception-xplanner/songsy/pretrained_models/google/siglip-so400m-patch14-384" \
     --mm_projector_type mlp2x_gelu \
-    --video_frames 64 \
+    --video_frames 128 \
     --tile_image_input False \
     --fps 4 \
     --mm_vision_select_layer -2 \
@@ -43,7 +44,7 @@ torchrun --master_addr $MASTER_ADDR --master_port $MASTER_PORT --nnodes=${WORLD_
     --gradient_accumulation_steps 2 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
-    --save_steps 500 \
+    --save_steps 300 \
     --save_total_limit 1 \
     --learning_rate 2e-5 \
     --weight_decay 0. \
@@ -51,11 +52,13 @@ torchrun --master_addr $MASTER_ADDR --master_port $MASTER_PORT --nnodes=${WORLD_
     --lr_scheduler_type "cosine" \
     --logging_steps 1 \
     --tf32 True \
-    --model_max_length 4096 \
+    --model_max_length 8196 \
     --gradient_checkpointing True \
     --dataloader_num_workers 10 \
     --lazy_preprocess True \
     --report_to tensorboard \
     --run_name ${NAME}  \
     --routing_ratio 0.25 \
-    --cross_attn_experts 4
+    --cross_attn_experts 4 \
+    # --add_ts True \
+    # --lora_enable True \

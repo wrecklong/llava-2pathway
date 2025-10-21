@@ -1,5 +1,4 @@
-dataset_path: /workspace/group_share/adc-perception-xplanner/songsy/evaluate_datasets/hub/datasets--lmms-lab--Video-MME/snapshots/ead1408f75b618502df9a1d8e0950166bf0a2a0b
-dataset_kwargs:
+dataset_path: lmms-lab/MME
   token: True
 task: "mme"
 test_split: test

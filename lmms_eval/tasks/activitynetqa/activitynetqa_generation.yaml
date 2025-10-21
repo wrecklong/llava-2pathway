@@ -13,7 +13,23 @@ metric_list:
     aggregation: !function utils.activitynetqa_aggregate_accuracy # parse accuracy from each QA pairs
     higher_is_better: true
 
-include: _default_template_yaml
+dataset_path: /workspace/group_share/adc-perception-xplanner/songsy/evaluate_datasets/hub/datasets--lmms-lab--ActivityNetQA/snapshots/83e5a35a25748273ffcff353f161949b486925a9
+dataset_kwargs:
+  token: True
+  video: True
+  force_download: False
+  local_files_only: False
+  cache_dir: activitynetqa
+  data_files:
+    test: /workspace/group_share/adc-perception-xplanner/songsy/evaluate_datasets/hub/datasets--lmms-lab--ActivityNetQA/snapshots/83e5a35a25748273ffcff353f161949b486925a9/data/*.parquet
+lmms_eval_specific_kwargs:
+  default:
+    pre_prompt: ""
+    post_prompt: " Answer the question using a single word or phrase."
+
+metadata:
+  version: 0.0
+  gpt_eval_model_name: gpt-3.5-turbo-1106
 
 generation_kwargs:
   until:

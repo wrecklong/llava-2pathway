@@ -163,7 +163,9 @@ class LlavaQwen2pathwayModel(LlavaMetaModel, Qwen3Model):
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
             
-            layer_mask = activation_mask[:, layer_idx]
+            layer_mask=None
+            if activation_mask is not None:
+                layer_mask = activation_mask[:, layer_idx]
             if self.gradient_checkpointing and self.training:
                 #if not isinstance(decoder_layer, Qwen3HybridDecoderLayer):
                 layer_outputs = self._gradient_checkpointing_func(
@@ -198,6 +200,10 @@ class LlavaQwen2pathwayModel(LlavaMetaModel, Qwen3Model):
 
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
+            
+            # 显式清理中间变量以释放显存
+            if hasattr(torch.cuda, 'empty_cache') and layer_idx % 4 == 0:
+                torch.cuda.empty_cache()
 
         hidden_states = self.norm(hidden_states)
 
@@ -241,6 +247,8 @@ class LlavaQwen2pathwayForCausalLM(Qwen3ForCausalLM, LlavaMetaForCausalLM):
 
         # if hasattr(config, "routing_ratio"):
         #     self.initialize_router(config)
+        self.activation_mask = None
+        self.text_related_features_masks = None
         self.post_init()
 
     def get_model(self):
@@ -263,12 +271,19 @@ class LlavaQwen2pathwayForCausalLM(Qwen3ForCausalLM, LlavaMetaForCausalLM):
             module.gradient_checkpointing = value
     
     def ratio_loss(self, masks, ratio):
-        pred_loss = 0.0
+        if masks == None:
+            return torch.tensor(0.0, device=next(self.parameters()).device, dtype=next(self.parameters()).dtype, requires_grad=True)
+        
         if isinstance(masks, torch.Tensor):
             masks = [masks[i,:] for i in range(masks.shape[0])]
+        
+        pred_loss = torch.tensor(0.0, device=next(self.parameters()).device, dtype=next(self.parameters()).dtype, requires_grad=True)
         for i, mask in enumerate(masks):
-            pos_ratio = mask.to(torch.float32).mean()
-            pred_loss = pred_loss + ((pos_ratio - ratio) ** 2).mean()
+            if mask is None:
+                pos_ratio = ratio
+            else:
+                pos_ratio = mask.to(torch.float32).mean()
+            pred_loss = pred_loss + ((pos_ratio - ratio) ** 2)
         
         return pred_loss
 
@@ -324,10 +339,10 @@ class LlavaQwen2pathwayForCausalLM(Qwen3ForCausalLM, LlavaMetaForCausalLM):
         loss = None
         if labels is not None:
             loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.vocab_size)
-            cross_attn_ratio_loss = self.ratio_loss(self.activation_mask, float(self.model.config.cross_attn_experts/self.num_hidden_layers))
-            token_routing_ratio_loss = self.ratio_loss(self.text_related_features_masks, self.model.config.routing_ratio)
+            # cross_attn_ratio_loss = self.ratio_loss(self.activation_mask, float(self.model.config.cross_attn_experts/self.num_hidden_layers))
+            # token_routing_ratio_loss = self.ratio_loss(self.text_related_features_masks, self.model.config.routing_ratio)
         
-            loss = loss + cross_attn_ratio_loss + token_routing_ratio_loss
+            loss = loss #+ cross_attn_ratio_loss + token_routing_ratio_loss
 
         if not return_dict:
             output = (logits,) + outputs[1:]
@@ -383,27 +398,48 @@ class LlavaQwen2pathwayForCausalLM(Qwen3ForCausalLM, LlavaMetaForCausalLM):
 
         for batch_idx, (cur_input_ids, cur_image_features) in enumerate(zip(input_ids, image_features)):
             t, _ ,_ = cur_image_features.shape
+            text_related_features_mask = None
+            # if t > 1:
             cur_input_ids_without_image = cur_input_ids[cur_input_ids != IMAGE_TOKEN_INDEX]
             cur_input_text_embeds = self.get_model().embed_tokens(cur_input_ids_without_image)
             text_related_features_mask = self.token_router(cur_image_features, cur_input_text_embeds)
 
-            cur_text_related_features = cur_image_features.flatten(0,1)[text_related_features_mask]
-            cur_less_related_features = cur_image_features.flatten(0,1)[~text_related_features_mask]
-            n, _ = cur_less_related_features.shape 
-            if t > 1:
-                merge, _ = bipartite_soft_matching(cur_less_related_features.unsqueeze(0), n//2)
-                merged_cur_less_related_feature = merge(cur_less_related_features.unsqueeze(0))
-                less_related_features.append(merged_cur_less_related_feature.squeeze(0))
+            # 直接使用soft mask进行加权，保持梯度传播
+            flattened_features = cur_image_features.flatten(0,1)
+            
+            if self.training:
+                # 训练时使用soft mask（加权）
+                mask_float = text_related_features_mask.float()
+                # 确保数据类型匹配
+                mask_float = mask_float.to(flattened_features.dtype)
+                cur_text_related_features = flattened_features * mask_float.unsqueeze(-1)
+                cur_less_related_features = flattened_features * (1 - mask_float.unsqueeze(-1))
             else:
-                less_related_features.append(cur_less_related_features)
+                # 推理时使用hard mask
+                cur_text_related_features = flattened_features[text_related_features_mask]
+                cur_less_related_features = flattened_features[~text_related_features_mask]
+
+            n, _ = cur_less_related_features.shape 
+
+                # merge, _ = bipartite_soft_matching(cur_less_related_features.unsqueeze(0), n//2)
+                # merged_cur_less_related_feature = merge(cur_less_related_features.unsqueeze(0))
+                # less_related_features.append(merged_cur_less_related_feature.squeeze(0))
+            less_related_features.append(cur_less_related_features)
+            # else:
+            #     cur_text_related_features = cur_image_features
+            #     less_related_features.append(cur_image_features.flatten(0,1))
     
-            text_related_features_masks.append(cur_less_related_features)
+            text_related_features_masks.append(text_related_features_mask)
             text_related_features.append(cur_text_related_features)
+            
+            # 定期清理显存
+            if batch_idx % 4 == 0 and hasattr(torch.cuda, 'empty_cache'):
+                torch.cuda.empty_cache()
 
         return text_related_features, less_related_features, text_related_features_masks
 
     def get_decoder(self):
-        return self.model        
+        return self.model
 
     def prepare_inputs_labels_for_multimodal(
         self, input_ids, position_ids, attention_mask, past_key_values, labels,
@@ -422,6 +458,8 @@ class LlavaQwen2pathwayForCausalLM(Qwen3ForCausalLM, LlavaMetaForCausalLM):
                 if hasattr(layer, "condition_vis_x"):
                     layer.media_locations = token_types
             
+            self.activation_mask = None
+
             return input_ids, position_ids, attention_mask, past_key_values, None, labels
 
         # handle image input
@@ -442,6 +480,9 @@ class LlavaQwen2pathwayForCausalLM(Qwen3ForCausalLM, LlavaMetaForCausalLM):
                                                     
             image_features.append(sample_feat.contiguous())
         del raw_image_features, all_features
+        # 显式清理显存
+        if hasattr(torch.cuda, 'empty_cache'):
+            torch.cuda.empty_cache()
 
         # # TODO: image start / end is not implemented here to support pretraining.
         # if getattr(self.config, 'tune_mm_mlp_adapter', False) and getattr(self.config, 'mm_use_im_start_end', False):
@@ -471,7 +512,38 @@ class LlavaQwen2pathwayForCausalLM(Qwen3ForCausalLM, LlavaMetaForCausalLM):
         # select more text related features & less text lerated features 
     
         text_related_features, less_related_features, text_related_features_masks = self.select_features_and_merge_features(image_features, input_ids)
+        hybrid_image_features = []
+        for features in zip(image_features, text_related_features):
+            t, n, c = features[0].shape
+            padding_features = features[0]
+            if t > 1:
+                temporal_stride = 8
+                T_downsampling_rate = temporal_stride
+
+                if t % T_downsampling_rate != 0:
+                    padding_size = (T_downsampling_rate - t % T_downsampling_rate) % T_downsampling_rate
+                    # Pad on the first dimension (sequence length) with zeros
+                    padding_features = nn.functional.pad(features[0], (0, 0, 0, 0, 0, padding_size))
+                 
+                b, n, c = padding_features.shape
+                h, w = int(n**0.5), int(n**0.5)
+                sample_feat = padding_features.reshape(b, h, w, c).permute(0, 3, 1, 2)
+                output_frames_num = min(b, 8)
+                downsample_image_features = nn.functional.adaptive_avg_pool3d(sample_feat.transpose(0, 1), output_size=(output_frames_num, h, w)).transpose(0, 1)
+                downsample_image_features = downsample_image_features.flatten(2,3).transpose(1,2).flatten(0,1)
+                hybrid_image_features.append(torch.cat([downsample_image_features, features[1]], dim=0))
+
+                del downsample_image_features, sample_feat, padding_features
+            else:
+                hybrid_image_features.append(features[1])
+        
+        text_related_features = hybrid_image_features
+        del hybrid_image_features
+        del image_features
         self.text_related_features_masks = text_related_features_masks
+        # 显式清理显存
+        if hasattr(torch.cuda, 'empty_cache'):
+            torch.cuda.empty_cache()
 
         ## set cross-attention states
         if isinstance(less_related_features, (list, tuple)):
@@ -543,7 +615,7 @@ class LlavaQwen2pathwayForCausalLM(Qwen3ForCausalLM, LlavaMetaForCausalLM):
                     cur_new_input_embeds.append(cur_text_related_features)
                     cur_new_labels.append(torch.full((cur_text_related_features.shape[0],), IGNORE_INDEX, device=cur_labels.device, dtype=cur_labels.dtype))
                     cur_new_token_type.append(torch.full((cur_text_related_features.shape[0],), 3, device=cur_labels.device, dtype=cur_labels.dtype)) # insert image token type
-
+            
             cur_new_input_embeds = [x.to(self.device) for x in cur_new_input_embeds]
 
             cur_new_input_embeds = torch.cat(cur_new_input_embeds)
@@ -612,9 +684,11 @@ class LlavaQwen2pathwayForCausalLM(Qwen3ForCausalLM, LlavaMetaForCausalLM):
         # token type
         token_types = new_token_types_padded
         # send token type to cross-attn layers
-        
-        activation_mask = self.cross_dynamic_router(less_related_features)
-        self.activation_mask = activation_mask
+        del new_labels_padded
+        del new_input_embeds_padded
+        del new_token_types_padded
+
+        self.activation_mask = self.cross_dynamic_router(less_related_features)
         
         if _input_ids is not None and _input_ids.shape[-1] == 1:
             pass

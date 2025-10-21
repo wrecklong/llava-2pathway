@@ -19,6 +19,9 @@ import numpy as np
 from PIL import ImageFile
 from datasets import DownloadConfig, Image, Sequence
 from huggingface_hub import snapshot_download
+# from modelscope import MsDataset
+# from modelscope import snapshot_download
+
 from tenacity import retry, stop_after_attempt, wait_fixed, stop_after_delay
 from tqdm import tqdm
 
@@ -786,8 +789,8 @@ class ConfigurableTask(Task):
                 if accelerator.is_main_process:
                     force_download = dataset_kwargs.get("force_download", False)
                     force_unzip = dataset_kwargs.get("force_unzip", False)
-                    cache_path = snapshot_download(repo_id=self.DATASET_PATH, repo_type="dataset", force_download=force_download, etag_timeout=60)
-                    #cache_path = self.DATASET_PATH
+                    #cache_path = snapshot_download(repo_id=self.DATASET_PATH, repo_type="dataset", force_download=force_download, etag_timeout=60)
+                    cache_path = self.DATASET_PATH
                     zip_files = glob(os.path.join(cache_path, "**/*.zip"), recursive=True)
                     tar_files = glob(os.path.join(cache_path, "**/*.tar*"), recursive=True)
 

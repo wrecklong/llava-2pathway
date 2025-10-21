@@ -1,4 +1,4 @@
-dataset_path: /workspace/group_share/adc-perception-xplanner/songsy/evaluate_datasets/hub/datasets--longvideobench--LongVideoBench/snapshots/60d1c89c1919a198b73be39c2babb213b29d6a5c
+dataset_path: longvideobench/LongVideoBench
 dataset_kwargs:
   token: True
   cache_dir: longvideobench

@@ -8,14 +8,16 @@ import math
 import ast
 
 from transformers import StoppingCriteria
-from llava.constants import IMAGE_TOKEN_INDEX
-
+# from llava.constants import IMAGE_TOKEN_INDEX
+IMAGE_TOKEN_INDEX = -100
 from decord import VideoReader
 from decord import cpu
 
 import av
 from av.codec.context import CodecContext
 import numpy as np
+from PIL import ImageDraw, ImageFont
+import os
 
 def get_frame_indices(total_frames, original_fps, target_fps, num_frm):
     sample_fps = round(original_fps / target_fps)
@@ -28,21 +30,84 @@ def get_frame_indices(total_frames, original_fps, target_fps, num_frm):
     frame_idx = [frame_idx[i] for i in uniform_idx]
     return frame_idx
 
-def read_video_decord(video_path, num_frm=16, target_fps=2):
+
+def add_timestamp_to_frame(frame, start_sec, end_sec, font_size=40):
+    # 计算时间戳区域高度（基于原图像高度）
+    timestamp_height = int(frame.height * 0.04)  # 原图像高度的10%
+    
+    # 创建新的画布（高度增加时间戳区域）
+    new_height = frame.height + timestamp_height
+    new_frame = Image.new('RGB', (frame.width, new_height), color=(255, 255, 255))
+    
+    # 将原图像粘贴到新画布的下半部分
+    new_frame.paste(frame, (0, timestamp_height))
+    
+    # 在新画布的上半部分添加时间戳
+    draw = ImageDraw.Draw(new_frame)
+    font_size = int(frame.height * 0.04)
+    #font = ImageFont.load_default(font_size)
+    font = ImageFont.truetype("DejaVuSans.ttf", font_size)
+    
+    text = f"{sec2hms(start_sec)}-{sec2hms(end_sec)}"
+    bbox = draw.textbbox((0, 0), text, font=font)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    
+    # 时间戳居中显示在上方区域
+    x = (frame.width - text_w) // 2
+    y = (timestamp_height - text_h - 3) // 2
+    
+    # 修复矩形绘制：使用 RGB 颜色，不透明
+    draw.rectangle([x-15, y-6, x+text_w+15, y+text_h+6], fill=(50, 50, 50))  # 移除了透明度
+    draw.text((x, y), text, fill=(255, 255, 255), font=font)
+    
+    return new_frame
+    
+def sec2hms(seconds):
+    seconds = int(round(seconds))
+    h = seconds // 3600
+    m = (seconds % 3600) // 60
+    s = seconds % 60
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
+def read_video_decord(video_path, num_frm=16, target_fps=2, add_ts=False):
     vr = VideoReader(video_path, ctx=cpu(0), num_threads=1)
     total_frames = len(vr)
     original_fps = vr.get_avg_fps()
 
     target_fps = min(target_fps, original_fps) # target fps should not exceed the video fps
     indices = get_frame_indices(total_frames, original_fps, target_fps, num_frm)
-    frames = vr.get_batch(indices)
-    vr.seek(0)
+    frames = vr.get_batch(indices).asnumpy()
+    frames = [Image.fromarray(frames[i]) for i in range(frames.shape[0])]
     
-    # video info string
     total_time = total_frames/original_fps
-    video_info_string = f"Time: {round(total_time, 2)}s; Time interval between frame {round(total_time/len(indices),3)}s; video tokens:"
+    time_interval = round(total_time/len(indices),3)
+    start_sec, end_sec = 0,0
+    frames_with_ts = []
+    if add_ts:
+        for i, frame in enumerate(frames):
+            start_sec = i * time_interval
+            end_sec = start_sec + time_interval
+            frame_with_ts = add_timestamp_to_frame(frame, start_sec, end_sec)
+            frames_with_ts.append(frame_with_ts)
+        frames = frames_with_ts
+
     
-    return frames.asnumpy(), video_info_string
+    # save_dir = 'output_frames-'
+    # if not os.path.exists(save_dir):
+    #     os.makedirs(save_dir, exist_ok=True)
+
+    #     for idx, frame in enumerate(frames):
+    #         video_name = video_path.split('/')[-1].replace('.mp4', '')
+    #         frame.save(os.path.join(save_dir, f'{video_name}_frame_{idx:03d}.jpg'))
+
+    vr.seek(0)
+    # video info string
+    video_info_string = f"Time: {round(total_time, 2)}s; Time interval between frame {time_interval}s; video tokens:"
+    
+    return frames, video_info_string
+
+# read_video_decord("/workspace/p-songsy@xiaopeng.com/llava-2pathway/assets/catinterrupt.mp4", 64, 4)
 
 def read_video_pyav2(video_path, num_frm=16, target_fps=1, threads=4):
     container = av.open(video_path)

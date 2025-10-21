@@ -1,11 +1,14 @@
-dataset_path: lmms-lab/Video-MME
+dataset_path: parquet
 dataset_kwargs:
   token: True
   cache_dir: videomme
   video: True
+  data_files:
+    test: /workspace/group_share/adc-perception-xplanner/songsy/AI-ModelScope/Video-MME/videomme/*parquet
   # From_YouTube: True
 task: videomme
 test_split: test
+validation_split: null
 output_type: generate_until
 doc_to_visual: !function utils.videomme_doc_to_visual
 doc_to_text: !function utils.videomme_doc_to_text

@@ -3,6 +3,9 @@ dataset_kwargs:
   token: True
   cache_dir: mvbench
   video: True
+  data_files: 
+    train: /workspace/group_share/adc-perception-xplanner/songsy/evaluate_datasets/hub/datasets--OpenGVLab--MVBench/snapshots/230a2d4fac8900333c61754641c7a13e069ac9c6/json/action_antonym.json 
+
 generation_kwargs:
   max_new_tokens: 16
   temperature: 0

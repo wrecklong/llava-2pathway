@@ -1,8 +1,11 @@
-dataset_path: sy1998/MLVU_dev
+dataset_path: parquet
 dataset_kwargs:
   token: True
   cache_dir: mlvu
   video: True
+  data_files:
+    test: 
+      /workspace/group_share/adc-perception-xplanner/songsy/evaluate_datasets/hub/datasets--sy1998--MLVU_dev/snapshots/96207eb9aa7101e2a495dd147684a7e618c79e12/mlvu/*.parquet
 generation_kwargs:
   max_new_tokens: 16
   temperature: 0

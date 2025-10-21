@@ -1,6 +1,6 @@
 #!/bin/bash
 NAME=$1
-ANNOTATION_PATH="/workspace/p-songsy@xiaopeng.com/Slow-Fast-Video-Multimodal-LLM/scripts/exp_pretrain.yaml"
+ANNOTATION_PATH="./scripts/exp_pretrain.yaml"
 IMAGE_DIR="/workspace/group_share/adc-perception-xplanner/songsy/datasets/LLaVA-Pretrain"
 VIDEO_DIR="/workspace/group_share/adc-perception-xplanner/songsy/datasets/LLaVA-Video-178K"
 
@@ -38,7 +38,7 @@ torchrun --master_addr $MASTER_ADDR --master_port $MASTER_PORT --nnodes=${WORLD_
     --bf16 True \
     --output_dir /workspace/group_share/adc-perception-xplanner/songsy/llava-qwen-2pathway/$NAME/pretrain \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 1 \
+    --per_device_train_batch_size 2 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 2 \
     --evaluation_strategy "no" \
