@@ -193,13 +193,13 @@ class LlavaTrainer(Trainer):
                         real_model = maybe
                         break
             router_param_ids = set()
-            router_requires_cnt = 0
-            if hasattr(real_model, "token_router") and real_model.token_router is not None:
-                for p in real_model.token_router.parameters():
-                    if p.requires_grad:
-                        router_requires_cnt += 1
-                        router_param_ids.add(id(p))
-            print(f"[OPT-DEBUG] router 可训练参数数(创建optimizer之前): {router_requires_cnt}")
+            # router_requires_cnt = 0
+            # if hasattr(real_model, "token_router") and real_model.token_router is not None:
+            #     for p in real_model.token_router.parameters():
+            #         if p.requires_grad:
+            #             router_requires_cnt += 1
+            #             router_param_ids.add(id(p))
+            # print(f"[OPT-DEBUG] router 可训练参数数(创建optimizer之前): {router_requires_cnt}")
             # ==============================================================
             if self.args.mm_projector_lr is not None:
                 projector_parameters = [name for name, _ in opt_model.named_parameters() if "mm_projector" in name]
@@ -234,6 +234,8 @@ class LlavaTrainer(Trainer):
                 
             elif self.args.cross_attention_layer_lr:
                 cross_attn_parameters = [name for name, _ in opt_model.named_parameters() if "cross_attn_" in name]
+                router_parameters = [name for name, _ in opt_model.named_parameters() if "router" in name]
+                cross_attn_parameters.extend(router_parameters)
                 optimizer_grouped_parameters = [
                     {
                         "params": [
@@ -311,16 +313,16 @@ class LlavaTrainer(Trainer):
                 ]
 
             # 统计分组中包含的 router 参数数量与对应 lr（在真正构建 optimizer 前）
-            included_cnt = 0
-            included_group_lrs = []
-            for g in optimizer_grouped_parameters:
-                grp_params = g.get("params", [])
-                hit = sum(1 for p in grp_params if id(p) in router_param_ids)
-                if hit > 0:
-                    included_cnt += hit
-                    grp_lr = g.get("lr", None)
-                    included_group_lrs.append(grp_lr)
-            print(f"[OPT-DEBUG] router 参数在 param_groups 中的数量: {included_cnt}, 组lr列表: {included_group_lrs}")
+            # included_cnt = 0
+            # included_group_lrs = []
+            # for g in optimizer_grouped_parameters:
+            #     grp_params = g.get("params", [])
+            #     hit = sum(1 for p in grp_params if id(p) in router_param_ids)
+            #     if hit > 0:
+            #         included_cnt += hit
+            #         grp_lr = g.get("lr", None)
+            #         included_group_lrs.append(grp_lr)
+            # print(f"[OPT-DEBUG] router 参数在 param_groups 中的数量: {included_cnt}, 组lr列表: {included_group_lrs}")
 
             optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(self.args)
 

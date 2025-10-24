@@ -339,10 +339,10 @@ class LlavaQwen2pathwayForCausalLM(Qwen3ForCausalLM, LlavaMetaForCausalLM):
         loss = None
         if labels is not None:
             loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.vocab_size)
-            # cross_attn_ratio_loss = self.ratio_loss(self.activation_mask, float(self.model.config.cross_attn_experts/self.num_hidden_layers))
-            # token_routing_ratio_loss = self.ratio_loss(self.text_related_features_masks, self.model.config.routing_ratio)
+            cross_attn_ratio_loss = self.ratio_loss(self.activation_mask, float(self.model.config.cross_attn_experts/self.num_hidden_layers))
+            token_routing_ratio_loss = self.ratio_loss(self.text_related_features_masks, self.model.config.routing_ratio)
         
-            loss = loss #+ cross_attn_ratio_loss + token_routing_ratio_loss
+            loss = loss + cross_attn_ratio_loss + token_routing_ratio_loss
 
         if not return_dict:
             output = (logits,) + outputs[1:]

@@ -47,6 +47,7 @@ torchrun --master_addr $MASTER_ADDR --master_port $MASTER_PORT --nnodes=${WORLD_
     --save_total_limit 1 \
     --learning_rate 1e-3 \
     --cross_attention_layer_lr 2e-4 \
+    --max_grad_norm 0.1 \
     --weight_decay 0. \
     --warmup_ratio 0.03 \
     --lr_scheduler_type "cosine" \

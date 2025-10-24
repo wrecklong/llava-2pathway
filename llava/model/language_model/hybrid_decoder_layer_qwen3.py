@@ -1546,6 +1546,14 @@ class Predictor(nn.Module):
             nn.Linear(embed_dim // 8, 2),
             nn.LogSoftmax(dim=-1)
         )
+        
+        # 初始化 Predictor 网络权重
+        for module in [self.visual_in_proj, self.text_in_proj, self.out_proj]:
+            for layer in module.modules():
+                if isinstance(layer, nn.Linear):
+                    nn.init.normal_(layer.weight, mean=0.0, std=0.02)
+                    if layer.bias is not None:
+                        nn.init.zeros_(layer.bias)
 
     def forward(self, visual_tokens, text_tokens):
         visual_tokens = self.visual_in_proj(visual_tokens)
@@ -1556,10 +1564,43 @@ class Predictor(nn.Module):
         x = x.flatten(0,1)
         x = torch.cat([x, text_tokens.mean(dim=0,  keepdim=True).expand(B*N, C)], dim=-1)
         scores = self.out_proj(x)
+        
+        # 添加数值稳定性检查
+        if self.training:
+            if torch.isnan(scores).any():
+                print(f"[Predictor] Warning: NaN detected in scores")
+                scores = torch.zeros_like(scores)
+            if torch.isinf(scores).any():
+                print(f"[Predictor] Warning: Inf detected in scores")
+                scores = torch.clamp(scores, -10, 10)
 
         if self.training:
-            text_related_tokens_mask = F.gumbel_softmax(scores, tau=1, hard=True, dim=-1)[:, 0]
-            # topk_probs, topk_indices = torch.topk(probs, self.num_experts, dim=-1)
+            # 训练时：使用温度缩放的 softmax + Top-K
+            if hasattr(self, 'training_step'):
+                tau = max(0.1, 1.0 * (0.9 ** self.training_step))
+            else:
+                tau = 1.0
+            
+            # 温度缩放的 softmax，添加数值稳定性
+            scores_scaled = scores / tau
+            # 减去最大值避免数值溢出
+            scores_scaled = scores_scaled - scores_scaled.max(dim=-1, keepdim=True)[0]
+            probs = F.softmax(scores_scaled, dim=-1)
+            
+            # 根据 routing_ratio 选择 token 数量
+            num_text_related_tokens = int(B*N*self.routing_ratio)
+            topk_probs, topk_indices = torch.topk(probs[:, 0], num_text_related_tokens, dim=-1)
+            
+            # 创建软掩码（用于梯度传播）
+            soft_mask = torch.zeros_like(probs[:, 0])
+            soft_mask.scatter_(-1, topk_indices, topk_probs)
+            
+            # 创建硬掩码（用于前向传播）
+            hard_mask = torch.zeros_like(probs[:, 0])
+            hard_mask.scatter_(-1, topk_indices, 1.0)
+            
+            # Straight-Through 技巧
+            text_related_tokens_mask = hard_mask.detach() + soft_mask - soft_mask.detach()
         else:
             probs = F.softmax(scores, dim=-1)[:, 0]
             num_text_related_tokens = int(B*N*self.routing_ratio)
@@ -1580,11 +1621,21 @@ class DynamicRouter(nn.Module):
         # 用输入特征的均值作为路由输入
         self.router = nn.Sequential(
             nn.Linear(d_model, d_model//2),
+            nn.LayerNorm(d_model//2),  # 添加 LayerNorm 稳定训练
             nn.ReLU(),
             nn.Linear(d_model//2, d_model//4),
+            nn.LayerNorm(d_model//4),  # 添加 LayerNorm 稳定训练
             nn.ReLU(),
             nn.Linear(d_model//4, num_layers)  # 输出每层的得分
         )
+        
+        # 初始化路由网络权重，使用较小的标准差避免梯度爆炸
+        for module in self.router.modules():
+            if isinstance(module, nn.Linear):
+                # 使用 Xavier 初始化，但标准差更小
+                nn.init.xavier_normal_(module.weight, gain=0.1)
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
 
         
         # 负载均衡辅助损失
@@ -1598,10 +1649,48 @@ class DynamicRouter(nn.Module):
         # 确保数据类型匹配
         pooled = pooled.to(next(self.router.parameters()).dtype)
         scores = self.router(pooled)  # [batch, num_layers]
-        # Gumbel-Softmax采样（训练时用soft近似，推理时硬采样）
+        
+        # 添加数值稳定性检查和梯度监控
         if self.training:
-            activation_mask = F.gumbel_softmax(scores, tau=1, hard=True, dim=-1)
-            # topk_probs, topk_indices = torch.topk(probs, self.num_experts, dim=-1)
+            if torch.isnan(scores).any():
+                print(f"[DynamicRouter] Warning: NaN detected in scores")
+                scores = torch.zeros_like(scores)
+            if torch.isinf(scores).any():
+                print(f"[DynamicRouter] Warning: Inf detected in scores")
+                scores = torch.clamp(scores, -10, 10)
+            
+            # 监控得分范围，如果过大则进行裁剪
+            # if scores.abs().max() > 2.0:
+            #     print(f"[DynamicRouter] Warning: Large scores detected: {scores.abs().max()}")
+            #     scores = torch.clamp(scores, -2.0, 2.0)
+        
+        # Top-K 路由选择
+        if self.training:
+            # 训练时：使用温度缩放的 softmax + Top-K
+            if hasattr(self, 'training_step'):
+                tau = max(0.1, 1.0 * (0.9 ** self.training_step))
+            else:
+                tau = 1.0
+            
+            # 温度缩放的 softmax，添加数值稳定性
+            scores_scaled = scores / tau
+            # 减去最大值避免数值溢出
+            scores_scaled = scores_scaled - scores_scaled.max(dim=-1, keepdim=True)[0]
+            probs = F.softmax(scores_scaled, dim=-1)
+            
+            # Top-K 选择
+            topk_probs, topk_indices = torch.topk(probs, self.num_experts, dim=-1)
+            
+            # 创建软掩码（用于梯度传播）
+            soft_mask = torch.zeros_like(probs)
+            soft_mask.scatter_(-1, topk_indices, topk_probs)
+            
+            # 创建硬掩码（用于前向传播）
+            hard_mask = torch.zeros_like(probs)
+            hard_mask.scatter_(-1, topk_indices, 1.0)
+            
+            # Straight-Through 技巧
+            activation_mask = hard_mask.detach() + soft_mask - soft_mask.detach()
         else:
             probs = F.softmax(scores, dim=-1)
             topk_probs, topk_indices = torch.topk(probs, self.num_experts, dim=-1)

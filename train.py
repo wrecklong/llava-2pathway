@@ -1500,8 +1500,6 @@ def train(attn_implementation=None):
             if isinstance(module, Qwen3HybridDecoderLayer):
                 module.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device=training_args.device)
         
-        # 全局冻结所有参数
-        model.requires_grad_(False)
 
         # 然后重新设置需要训练的参数
         for name, module in model.named_modules():
@@ -1541,9 +1539,9 @@ def train(attn_implementation=None):
     
     # 遍历模型参数，打印那些需要梯度的参数
     # print("需要梯度的参数如下：")
-    # for name, param in model.named_parameters():
-    #     if param.requires_grad:
-    #         print(name)
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            print(name)
     
     trainer = LlavaTrainer(model=model,
                            tokenizer=tokenizer,
